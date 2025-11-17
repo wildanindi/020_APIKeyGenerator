@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <style>
+        /* --- CSS RESET & LAYOUT --- */
+        body {
+            margin: 0; font-family: 'Segoe UI', sans-serif;
+            background-color: #1a202c; color: #fff;
+            display: flex; height: 100vh; overflow: hidden;
+        }
+
+        /* --- SIDEBAR --- */
+        .sidebar {
+            width: 250px; background-color: #2d3748;
+            display: flex; flex-direction: column;
+            border-right: 1px solid #4a5568;
+        }
+        .sidebar-header {
+            padding: 20px; background-color: #dd6b20; /* Orange Admin */
+            font-weight: bold; text-align: center; font-size: 1.2rem;
+        }
+        .menu { list-style: none; padding: 0; margin: 0; }
+        .menu li { border-bottom: 1px solid #4a5568; }
+        .menu a {
+            display: block; padding: 15px 20px; text-decoration: none; color: #cbd5e0;
+            transition: 0.3s; cursor: pointer;
+        }
+        .menu a:hover, .menu a.active { background-color: #4a5568; color: #fff; border-left: 4px solid #dd6b20; }
+
+        /* --- CONTENT AREA --- */
+        .main-content { flex: 1; padding: 2rem; overflow-y: auto; }
+        .header-title { font-size: 1.8rem; margin-bottom: 1rem; border-bottom: 2px solid #4a5568; padding-bottom: 10px; }
+
+        /* --- TABLES --- */
+        .table-container { display: none; animation: fadeIn 0.5s; }
+        .table-container.active { display: block; }
+
+        table { width: 100%; border-collapse: collapse; background-color: #2d3748; border-radius: 8px; overflow: hidden; }
+        th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #4a5568; }
+        th { background-color: #171923; color: #dd6b20; font-weight: bold; }
+        tr:hover { background-color: #4a5568; }
+        
+        /* Status Badge */
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.8rem; }
+        .badge-green { background-color: #38a169; color: white; }
+        .badge-red { background-color: #e53e3e; color: white; }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+    <div class="sidebar">
+        <div class="sidebar-header">ADMIN PANEL</div>
+        <ul class="menu">
+            <li><a onclick="showSection('users', this)" class="active">Data User</a></li>
+            <li><a onclick="showSection('admins', this)">Data Admin</a></li>
+            <li><a onclick="showSection('keys', this)">API Keys</a></li>
+            <li><a href="/" style="margin-top: 20px; color: #fc8181;">&larr; Logout / Home</a></li>
+        </ul>
+    </div>
+
+    <div class="main-content">
+        
+        <div id="users" class="table-container active">
+            <div class="header-title">Daftar Pengguna (User)</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Nama Depan</th>
+                        <th>Nama Belakang</th>
+                        <th>Email</th>
+                        <th>Terdaftar</th>
+                    </tr>
+                </thead>
+                <tbody id="userTableBody">
+                    <tr><td colspan="5">Memuat data...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div id="admins" class="table-container">
+            <div class="header-title">Daftar Administrator</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Email Admin</th>
+                        <th>Terakhir Login</th>
+                    </tr>
+                </thead>
+                <tbody id="adminTableBody"></tbody>
+            </table>
+        </div>
+
+        <div id="keys" class="table-container">
+            <div class="header-title">Daftar API Key</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>API Key Value</th>
+                        <th>Tanggal Kadaluwarsa</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="keyTableBody"></tbody>
+            </table>
+        </div>
+
+    </div>
+
+    <script>
+        // Fungsi untuk format tanggal
+        function formatDate(isoString) {
+            if (!isoString) return '-';
+            return new Date(isoString).toLocaleString('id-ID');
+        }
+
+        // 1. LOAD DATA USERS
+        async function loadUsers() {
+            const res = await fetch('/api/users');
+            const data = await res.json();
+            const tbody = document.getElementById('userTableBody');
+            tbody.innerHTML = '';
+            
+            data.forEach(user => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${user.id}</td>
+                        <td>${user.first_name}</td>
+                        <td>${user.last_name || '-'}</td>
+                        <td>${user.email}</td>
+                        <td>${formatDate(user.created_at)}</td>
+                    </tr>`;
+            });
+        }
+
+        // 2. LOAD DATA ADMINS
+        async function loadAdmins() {
+            const res = await fetch('/api/admins');
+            const data = await res.json();
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = '';
+
+            data.forEach(admin => {
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${admin.id}</td>
+                        <td>${admin.email}</td>
+                        <td>${formatDate(admin.last_login)}</td>
+                    </tr>`;
+            });
+        }
+
+        // 3. LOAD DATA KEYS
+        async function loadKeys() {
+            const res = await fetch('/api/keys');
+            const data = await res.json();
+            const tbody = document.getElementById('keyTableBody');
+            tbody.innerHTML = '';
+
+            data.forEach(key => {
+                const isExpired = new Date(key.out_of_date) < new Date();
+                const status = isExpired 
+                    ? '<span class="badge badge-red">Expired</span>' 
+                    : '<span class="badge badge-green">Active</span>';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td style="font-family: monospace;">${key.KeyValue.substring(0, 20)}...</td>
+                        <td>${formatDate(key.out_of_date)}</td>
+                        <td>${status}</td>
+                    </tr>`;
+            });
+        }
+
+        // FUNGSI GANTI TAB
+        function showSection(id, linkElement) {
+            // Sembunyikan semua section
+            document.querySelectorAll('.table-container').forEach(el => el.classList.remove('active'));
+            // Tampilkan section yang dipilih
+            document.getElementById(id).classList.add('active');
+
+            // Update menu active state
+            document.querySelectorAll('.menu a').forEach(el => el.classList.remove('active'));
+            linkElement.classList.add('active');
+
+            // Refresh data saat tab dibuka
+            if(id === 'users') loadUsers();
+            if(id === 'admins') loadAdmins();
+            if(id === 'keys') loadKeys();
+        }
+
+        // Load default saat pertama buka
+        loadUsers();
+
+    </script>
+</body>
+</html>
